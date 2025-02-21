@@ -1,4 +1,6 @@
 발표 슬라이드: https://github.com/cequala/Data-Analysis-Projects/blob/main/Research/A_Comparative_Study_on_Bayesian_SVDD_Models.pdf
+(이 텍스트는 다운받으면 편하게 볼 수 있습니다)
+
 
 Support Vector Data Description(이하 SVDD) (Tax and Duin, 2004)과, 그에 베이지안을 적용한 3가지 방법론들을 비교 연구하였습니다. SVDD는 Support Vector Machine(이하 SVM)을 개조하여 이상치 탐지에 활용할 수 있는 알고리즘입니다. 데이터를 보다 높은 차원의 공간, 즉 커널 공간에서 분류한다는 아이디어는 SVM과 같으나 SVDD는 불균형 데이터에 특화된 것이 차이입니다. 불균형 데이터란 클래스마다의 크기의 차이가 극심한 데이터로, 이진 불균형 데이터의 예시로 제조업에서의 불량품 데이터를 들 수 있습니다. 이러한 데이터에 대해 SVDD는 커널 공간에서 정상 클래스를 구 형태로 감싸는 경계면을 만들어 새로운 데이터의 정상 여부를 판단합니다.
 
