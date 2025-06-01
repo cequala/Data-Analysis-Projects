@@ -1,0 +1,668 @@
+---
+title: "Batch Correction and Statistical Analysis of Gene Expression Data"
+output: github_document
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+```{r Visualization setting for VScode, include=FALSE}
+# library(httpgd); hgd(); hgd_browse()
+```
+```{r Initial setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load required libraries
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+# BiocManager::install("limma"); BiocManager::install("preprocessCore"); BiocManager::install("sva")
+library(limma); library(preprocessCore); library(sva) # From Bioconductor
+library(ggplot2); library(ggpubr); library(FactoMineR); library(ggrepel); library(patchwork); library(reshape2)
+library(grid); library(gridExtra); library(MASS); library(skimr); library(dplyr); library(tidyr); library(openxlsx); library(stringr)
+library(survival); library(survminer); library(maxstat); library(knitr) # For survivial analysis
+# Set seed for reproducibility
+set.seed(42)
+# Use the normal numerical representation
+options(scipen = 999)
+# Set the working directory
+setwd('G:/My Drive/Projects/Public/gastric_cancer/Xeloxp')
+```
+# Data preprocessing
+```{r}
+# Load total_WTS.txt from the data directory
+# Read the data
+df <- read.table("WTS/XP_TPM.txt", header = TRUE, sep = "\t", 
+                   stringsAsFactors = FALSE)
+# Check the size of the df
+dim(df)
+```
+```{r}
+head(df$GeneSymbol)
+```
+```{r}
+# Check the column names having "F3" in them
+grep("F3", colnames(df), value = TRUE)
+```
+```{r}
+# Remove columns with "F3" in their names
+df <- df[, !grepl("F3", colnames(df))]
+# Check the size of the df again
+ncol(df)
+ncol(df[grep("E", colnames(df))])
+```
+```{r}
+head(colnames(df)[grep("E", colnames(df))])
+length(colnames(df)[grep("E", colnames(df))])
+```
+```{r}
+# subsets
+df_B_N <- df[, c(grep("_B_N$", colnames(df), value = TRUE))]
+df_B_T <- df[, c(grep("_B_T$", colnames(df), value = TRUE))]
+df_F1_N <- df[, c(grep("_F1_N$", colnames(df), value = TRUE))]
+df_F1_T <- df[, c(grep("_F1_T$", colnames(df), value = TRUE))]
+df_F2_N <- df[, c(grep("_F2_N$", colnames(df), value = TRUE))]
+df_F2_T <- df[, c(grep("_F2_T$", colnames(df), value = TRUE))]
+ncol(df_B_N); ncol(df_B_T); ncol(df_F1_N); ncol(df_F1_T); ncol(df_F2_N); ncol(df_F2_T)
+ncol(df_B_N) + ncol(df_B_T) + ncol(df_F1_N) + ncol(df_F1_T) + ncol(df_F2_N) + ncol(df_F2_T)
+```
+```{r}
+# 1. 샘플 이름 추출 (df에서 유전자 칼럼이 없다면 그대로 colnames(df))
+sample_cols <- colnames(df)
+
+# 2. 정규표현식에 매칭되는 컬럼만 추출
+valid_cols <- sample_cols[str_detect(sample_cols, "_[BF][12]?_[NT]$")]
+
+# 3. 매칭되지 않는 컬럼 찾기
+invalid_cols <- setdiff(sample_cols, valid_cols)
+
+# 4. 결과 출력
+invalid_cols
+```
+```{r}
+# Check the number of columns in each subset (note that Genesymbol is included 6 times)
+ncol(df_B_N) + ncol(df_B_T) + ncol(df_F1_N) + ncol(df_F1_T) + ncol(df_F2_N) + ncol(df_F2_T)
+ncol(df[grep("E", colnames(df))])
+```
+```{r}
+head(rownames(df)); head(df$GeneSymbol)
+```
+```{r}
+# 테이블로 개수 세기
+dup_counts <- table(df$GeneSymbol)
+# 2개 이상 중복된 값만 추출
+dup_over2 <- dup_counts[dup_counts >= 2]
+dup_df <- as.data.frame(dup_over2)
+# 결과 출력
+dup_df
+```
+```{r}
+nrow(dup_df) # 중복된 GeneSymbol의 개수
+# 1st row of the dup_over2 df
+for (i in 1:nrow(dup_df)) {
+  if (dup_df[i,]$Freq != 2) {
+    print("There are GeneSymbols with more than 2 duplicates.")
+    break
+  }
+  if (i == nrow(dup_df)) {
+    print("All GeneSymbols have exactly 2 duplicates.")
+  }
+}
+```
+GeneSymbol 중복된 건 78쌍 있는데, 다 2개씩 중복돼 있음.
+중복된 값들이 서로 다 같다면, 하나씩만 남기고 다 없어버리자.
+```{r}
+# 1. 중복된 GeneSymbol 목록 (정확히 2개씩 있는 애들)
+dup_symbols <- dup_df$Var1
+
+# 2. 빈 리스트에 병합된 결과 저장
+merged_list <- lapply(dup_symbols, function(sym) {
+  rows <- df[df$GeneSymbol == sym, ]
+  summed <- colSums(rows[ , sapply(rows, is.numeric)])  # 수치형만 합치기
+  data.frame(GeneSymbol = sym, t(summed), check.names = FALSE)
+})
+
+length(merged_list) # 병합된 리스트의 길이 확인
+```
+```{r}
+# 3. 리스트를 하나의 데이터프레임으로 변환
+merged_df <- do.call(rbind, merged_list)
+
+# 4. 중복된 두 행 제거 + 병합된 행 추가
+df_unique <- df[!df$GeneSymbol %in% dup_symbols, ]  # 중복 아닌 애들만 남기기
+df_final <- rbind(df_unique, merged_df)
+
+# 5. rownames 재정리 (선택사항)
+rownames(df_final) <- NULL
+
+# GeneSymbol 칼럼을 기준으로 정렬
+df_final <- df_final[order(df_final$GeneSymbol), ]
+nrow(df_final); nrow(df)
+nrow(df) - nrow(df_final)
+```
+```{r}
+df <- df_final
+```
+# Batch Correction
+## Check clusters
+PC플롯 확인 건너뛰고 도메인 지식 사용. 시퀀싱한 순서를 알고 있다.
+```{r}
+head(colnames(df), 30)
+```
+```{r}
+# 칼럼 이름에서 샘플 번호 추출 함수
+extract_sample_number <- function(colname) {
+    if (colname == "GeneSymbol") {
+        return(NA)
+    }
+    as.numeric(sub("E(\\d+)_.*", "\\1", colname))
+}
+# 숫자 추출
+sample_numbers <- sapply(colnames(df), extract_sample_number)
+# NA 발생한 컬럼명 확인
+colnames(df)[is.na(sample_numbers)]
+```
+```{r}
+# 배치 구분
+sample_numbers <- sapply(colnames(df), extract_sample_number)
+
+batch0_samples <- colnames(df)[sample_numbers >= 1 & sample_numbers <= 19]
+batch1_samples <- colnames(df)[sample_numbers >= 20 & sample_numbers <= 47]
+batch2_samples <- colnames(df)[sample_numbers >= 49 & sample_numbers <= 68]
+
+# 알파벳순 정렬
+batch0_samples <- sort(batch0_samples)
+batch1_samples <- sort(batch1_samples)
+batch2_samples <- sort(batch2_samples)
+
+# 출력
+cat("Batch0 샘플 목록:\n", paste(batch0_samples, collapse = ", "), "\n\n")
+cat("Batch1 샘플 목록:\n", paste(batch1_samples, collapse = ", "), "\n\n")
+cat("Batch2 샘플 목록:\n", paste(batch2_samples, collapse = ", "), "\n\n")
+```
+```{r}
+# GeneSymbol 제외한 전체 칼럼
+all_expr_cols <- setdiff(colnames(df), "GeneSymbol")
+
+# 배치 샘플 다 합치기
+batch_samples_all <- c(batch0_samples, batch1_samples, batch2_samples)
+
+# 누락된 컬럼 확인
+setdiff(all_expr_cols, batch_samples_all)
+```
+48번 환자를 잘 뺐으니, 이를 df에서도 제거하자.
+## Batch Correction with ComBat
+```{r}
+df <- df[, c("GeneSymbol", batch_samples_all)] # GeneSymbol과 배치 샘플만 남기기
+rownames(df) <- df$GeneSymbol # 1. 첫 번째 칼럼(GeneSymbol)을 rowname으로 지정
+df$GeneSymbol <- NULL # 2. rowname으로 옮겼으니 GeneSymbol 칼럼 제거
+df_matrix <- as.matrix(df) # 3. matrix로 변환
+```
+```{r}
+### 1. 메타데이터 생성
+metadf <- data.frame(ID = colnames(df_matrix))
+
+# 배치 정보 할당
+metadf$Batch <- ifelse(metadf$ID %in% batch0_samples, "Batch0",
+                ifelse(metadf$ID %in% batch1_samples, "Batch1",
+                       ifelse(metadf$ID %in% batch2_samples, "Batch2", NA)))
+head(metadf$Batch); tail(metadf$Batch)
+```
+```{r}
+# 그룹 정보 추출 (예: G29_F2_T → F2_T)
+metadf$Group <- str_extract(metadf$ID, "[BF][12]?_[NT]$")
+
+# rownames을 ID로 지정 (ComBat 요구사항)
+rownames(metadf) <- metadf$ID
+
+data_norm = normalize.quantiles(log2(df_matrix + 1))
+dimnames(data_norm) = dimnames(df_matrix)
+
+### 2. 표현행렬 전처리
+exprdata <- data_norm  # 정규화된 log2 matrix 사용
+
+# 표준편차 기준 필터링 준비
+gene.sd <- apply(exprdata, 1, sd)
+```
+```{r}
+# 표준편차 기준 필터링
+CUTOFF <- 0.15
+exprdata_reduced <- exprdata[gene.sd > CUTOFF, ]
+nrow(exprdata_reduced); nrow(exprdata)
+```
+```{r}
+genes_removed_sd <- nrow(exprdata) - nrow(exprdata_reduced)
+genes_retained <- nrow(exprdata_reduced)
+
+# 배치 내에서 0인 유전자 제거
+for (b in unique(metadf$Batch)) {
+  bset <- metadf[metadf$Batch == b, ]
+  submatrix <- exprdata_reduced[, rownames(bset)]
+  exprdata_reduced <- exprdata_reduced[rowSums(submatrix) != 0, ]
+}
+
+### 3. ComBat 보정
+batch <- droplevels(as.factor(metadf$Batch))
+combat_expr <- ComBat(dat = exprdata_reduced, batch = batch, mod = NULL,
+                      par.prior = TRUE, prior.plots = FALSE)
+
+### 4. PCA
+PCA1 <- prcomp(t(combat_expr))
+var_explained <- round(100 * PCA1$sdev^2 / sum(PCA1$sdev^2), 2)
+
+PCA1_matrix <- data.frame(PCA1$x)
+PCA1_matrix$Batch <- batch
+PCA1_matrix$Group <- metadf$Group
+PCA1_matrix$ID <- rownames(PCA1_matrix)
+
+### 5. 배치 컬러 지정
+batch_colors <- c("Batch0" = "red", "Batch1" = "blue", "Batch2" = "green")
+
+### 6. PCA 시각화: PC1 vs PC2
+subtitle_text <- paste0(
+  "SD > ", CUTOFF,
+  " | Retained Genes: ", genes_retained,
+  "; Removed by SD: ", genes_removed_sd
+)
+
+# PC1 vs PC2
+p1 <- ggplot(PCA1_matrix, aes(x = PC1, y = PC2, color = Batch, label = ID)) +
+  geom_point(size = 2) +
+  geom_text_repel(size = 3, max.overlaps = 20) +
+  scale_color_manual(values = batch_colors) +
+  geom_hline(yintercept = 0, color = 'red', lty = 2) +
+  geom_vline(xintercept = 0, color = 'red', lty = 2) +
+  xlab(paste0("PC1 (", var_explained[1], "%)")) +
+  ylab(paste0("PC2 (", var_explained[2], "%)")) +
+  labs(
+    title = "PC1 vs PC2 (ComBat Corrected)",
+    subtitle = subtitle_text
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    legend.text = element_text(size = 6),
+    legend.key.size = unit(.5, 'cm'),
+    legend.title = element_text(size = 6)
+  )
+```
+```{r}
+# 결과 확인
+print(p1)
+```
+# Boxplot
+```{r}
+# 전제: rownames(combat_expr)는 유전자 이름, colnames는 샘플 이름
+# metadf에는 ID (colnames와 동일)와 Group 정보가 있음
+
+# 1. Group별 샘플 목록 생성
+group_names <- unique(metadf$Group)
+group_samples <- split(metadf$ID, metadf$Group) # 그룹명(Group) 기준으로 샘플 ID를 나눔
+
+# 2. Group별 데이터프레임 생성 (GeneSymbol 포함)
+group_dfs <- lapply(group_names, function(g) { # 각 그룹에 대해 유전자 × 샘플 서브셋을 생성
+  df <- data.frame(GeneSymbol = rownames(combat_expr),
+                   combat_expr[, group_samples[[g]], drop = FALSE],
+                   check.names = FALSE)
+  return(df)
+})
+
+# 3. 결과를 이름과 함께 리스트로 저장
+names(group_dfs) <- paste0("df_", group_names)
+
+# 4. 예: df_B_N, df_F2_T 등으로 개별 할당
+list2env(group_dfs, envir = .GlobalEnv) # df_B_N, df_F1_T 등의 이름으로 환경에 직접 저장
+```
+```{r}
+ncol(df_B_N) + ncol(df_B_T) +
+  ncol(df_F1_N) + ncol(df_F1_T) +
+  ncol(df_F2_N) + ncol(df_F2_T)
+```
+## Statistical Analysis
+```{r}
+genes_to_analyze <- c('CLDN18', 'CLDN1', 'CLDN4', 'CLDN7', 
+                      'EVA1A', 'LSR', 'PGAP3', 
+                      'PKD2L1', 'GJB2', 'ALPP', 'ALPG', 'MELTF', 'BST2')
+head(df_B_N$GeneSymbol)
+```
+```{r}
+# Check if all genes are present in df_B_N$GeneSymbol
+missing_genes <- setdiff(genes_to_analyze, df_B_N$GeneSymbol)
+length(missing_genes)
+```
+### B_N vs B_T
+```{r}
+# 결과 저장용 리스트
+test_results <- lapply(genes_to_analyze, function(gene) {
+  # 각 그룹의 발현량 벡터
+  expr_N <- as.numeric(df_B_N[df_B_N$GeneSymbol == gene, -1])
+  expr_T <- as.numeric(df_B_T[df_B_T$GeneSymbol == gene, -1])
+  
+  # 정규성 검정 (샘플 수 3 이상일 때만 의미 있음)
+  p_normal_N <- if (length(expr_N) >= 3) shapiro.test(expr_N)$p.value else NA
+  p_normal_T <- if (length(expr_T) >= 3) shapiro.test(expr_T)$p.value else NA
+  
+  # 등분산성 검정
+  p_var <- var.test(expr_N, expr_T)$p.value
+  
+  # 결과 정리
+  data.frame(
+    GeneSymbol = gene,
+    Normal_B_N = ifelse(!is.na(p_normal_N) & p_normal_N > 0.05, TRUE, FALSE),
+    Normal_B_T = ifelse(!is.na(p_normal_T) & p_normal_T > 0.05, TRUE, FALSE),
+    Equal_Variance = ifelse(p_var > 0.05, TRUE, FALSE),
+    P_Normal_B_N = round(p_normal_N, 4),
+    P_Normal_B_T = round(p_normal_T, 4),
+    P_Equal_Var = round(p_var, 4)
+  )
+})
+
+# 결과 데이터프레임으로 변환
+result_df <- do.call(rbind, test_results)
+result_df
+```
+```{r}
+# 분석 결과 저장용 리스트
+stat_results <- lapply(genes_to_analyze, function(gene) {
+  # 발현 데이터 추출
+  expr_N <- as.numeric(df_B_N[df_B_N$GeneSymbol == gene, -1])
+  expr_T <- as.numeric(df_B_T[df_B_T$GeneSymbol == gene, -1])
+  
+  # 해당 유전자의 검정 조건 확인
+  conds <- result_df[result_df$GeneSymbol == gene, ]
+  use_ttest <- with(conds, Normal_B_N & Normal_B_T & Equal_Variance)
+  
+  # 검정 수행
+  if (use_ttest) {
+    test_result <- t.test(expr_N, expr_T, alternative = "less")
+    test_used <- "t-test"
+  } else {
+    test_result <- wilcox.test(expr_N, expr_T, alternative = "less")
+    test_used <- "wilcox-test"
+  }
+  
+  pval <- round(test_result$p.value, 4)
+  signif <- pval < 0.05
+  
+  data.frame(
+    GeneSymbol = gene,
+    TestUsed = test_used,
+    Significant = signif,
+    P_Value = pval
+  )
+})
+
+# 결과 데이터프레임 생성
+stat_result_B <- do.call(rbind, stat_results)
+# 추후 플롯에서 factor 문제 방지 위해 문자형 변환
+stat_result_B$GeneSymbol <- as.character(stat_result_B$GeneSymbol)
+stat_result_B
+```
+### F1_N vs F1_T
+```{r}
+# 결과 저장용 리스트
+test_results <- lapply(genes_to_analyze, function(gene) {
+  # 각 그룹의 발현량 벡터
+  expr_N <- as.numeric(df_F1_N[df_F1_N$GeneSymbol == gene, -1])
+  expr_T <- as.numeric(df_F1_T[df_F1_T$GeneSymbol == gene, -1])
+  
+  # 정규성 검정 (샘플 수 3 이상일 때만 의미 있음)
+  p_normal_N <- if (length(expr_N) >= 3) shapiro.test(expr_N)$p.value else NA
+  p_normal_T <- if (length(expr_T) >= 3) shapiro.test(expr_T)$p.value else NA
+  
+  # 등분산성 검정
+  p_var <- var.test(expr_N, expr_T)$p.value
+  
+  # 결과 정리
+  data.frame(
+    GeneSymbol = gene,
+    Normal_F1_N = ifelse(!is.na(p_normal_N) & p_normal_N > 0.05, TRUE, FALSE),
+    Normal_F1_T = ifelse(!is.na(p_normal_T) & p_normal_T > 0.05, TRUE, FALSE),
+    Equal_Variance = ifelse(p_var > 0.05, TRUE, FALSE),
+    P_Normal_F1_N = round(p_normal_N, 4),
+    P_Normal_F1_T = round(p_normal_T, 4),
+    P_Equal_Var = round(p_var, 4)
+  )
+})
+
+# 결과 데이터프레임으로 변환
+result_df <- do.call(rbind, test_results)
+result_df
+```
+```{r}
+# 분석 결과 저장용 리스트
+stat_results <- lapply(genes_to_analyze, function(gene) {
+  # 발현 데이터 추출
+  expr_N <- as.numeric(df_F1_N[df_F1_N$GeneSymbol == gene, -1])
+  expr_T <- as.numeric(df_F1_T[df_F1_T$GeneSymbol == gene, -1])
+  
+  # 해당 유전자의 검정 조건 확인
+  conds <- result_df[result_df$GeneSymbol == gene, ]
+  use_ttest <- with(conds, Normal_F1_N & Normal_F1_T & Equal_Variance)
+  
+  # 검정 수행
+  if (use_ttest) {
+    test_result <- t.test(expr_N, expr_T, alternative = "less")
+    test_used <- "t-test"
+  } else {
+    test_result <- wilcox.test(expr_N, expr_T, alternative = "less")
+    test_used <- "wilcox-test"
+  }
+  
+  pval <- round(test_result$p.value, 4)
+  signif <- pval < 0.05
+  
+  data.frame(
+    GeneSymbol = gene,
+    TestUsed = test_used,
+    Significant = signif,
+    P_Value = pval
+  )
+})
+
+# 결과 데이터프레임 생성
+stat_result_F1 <- do.call(rbind, stat_results)
+# 추후 플롯에서 factor 문제 방지 위해 문자형 변환
+stat_result_F1$GeneSymbol <- as.character(stat_result_F1$GeneSymbol)
+stat_result_F1
+```
+### F2_N vs F2_T
+```{r}
+# 결과 저장용 리스트
+test_results <- lapply(genes_to_analyze, function(gene) {
+  # 각 그룹의 발현량 벡터
+  expr_N <- as.numeric(df_F2_N[df_F2_N$GeneSymbol == gene, -1])
+  expr_T <- as.numeric(df_F2_T[df_F2_T$GeneSymbol == gene, -1])
+  
+  # 정규성 검정 (샘플 수 3 이상일 때만 의미 있음)
+  p_normal_N <- if (length(expr_N) >= 3) shapiro.test(expr_N)$p.value else NA
+  p_normal_T <- if (length(expr_T) >= 3) shapiro.test(expr_T)$p.value else NA
+  
+  # 등분산성 검정
+  p_var <- var.test(expr_N, expr_T)$p.value
+  
+  # 결과 정리
+  data.frame(
+    GeneSymbol = gene,
+    Normal_F2_N = ifelse(!is.na(p_normal_N) & p_normal_N > 0.05, TRUE, FALSE),
+    Normal_F2_T = ifelse(!is.na(p_normal_T) & p_normal_T > 0.05, TRUE, FALSE),
+    Equal_Variance = ifelse(p_var > 0.05, TRUE, FALSE),
+    P_Normal_F2_N = round(p_normal_N, 4),
+    P_Normal_F2_T = round(p_normal_T, 4),
+    P_Equal_Var = round(p_var, 4)
+  )
+})
+
+# 결과 데이터프레임으로 변환
+result_df <- do.call(rbind, test_results)
+result_df
+```
+```{r}
+# 분석 결과 저장용 리스트
+stat_results <- lapply(genes_to_analyze, function(gene) {
+  # 발현 데이터 추출
+  expr_N <- as.numeric(df_F2_N[df_F2_N$GeneSymbol == gene, -1])
+  expr_T <- as.numeric(df_F2_T[df_F2_T$GeneSymbol == gene, -1])
+  
+  # 해당 유전자의 검정 조건 확인
+  conds <- result_df[result_df$GeneSymbol == gene, ]
+  use_ttest <- with(conds, Normal_F2_N & Normal_F2_T & Equal_Variance)
+  
+  # 검정 수행
+  if (use_ttest) {
+    test_result <- t.test(expr_N, expr_T, alternative = "less")
+    test_used <- "t-test"
+  } else {
+    test_result <- wilcox.test(expr_N, expr_T, alternative = "less")
+    test_used <- "wilcox-test"
+  }
+  
+  pval <- round(test_result$p.value, 4)
+  signif <- pval < 0.05
+  
+  data.frame(
+    GeneSymbol = gene,
+    TestUsed = test_used,
+    Significant = signif,
+    P_Value = pval
+  )
+})
+
+# 결과 데이터프레임 생성
+stat_result_F2 <- do.call(rbind, stat_results)
+# 추후 플롯에서 factor 문제 방지 위해 문자형 변환
+stat_result_F2$GeneSymbol <- as.character(stat_result_F2$GeneSymbol)
+stat_result_F2
+```
+## Combine Results in Box + Violin plots
+```{r}
+# 바이올린 + 박스 + P-value 표시 함수
+make_pubr_vioplot <- function(expr_N, expr_T, label_N, label_T, stat_df, gene,
+                              median_line_size = 0.6,
+                              show_points = TRUE,
+                              pval_y = 10) {
+  df_plot <- data.frame(
+    Expression = c(expr_N, expr_T),
+    Group = rep(c(label_N, label_T), times = c(length(expr_N), length(expr_T)))
+  )
+  
+  p <- ggviolin(
+    df_plot,
+    x = "Group", y = "Expression", fill = "Group",
+    add = "boxplot",
+    add.params = list(fill = "white", width = 0.1, size = median_line_size),
+    palette = "jco",
+    trim = FALSE
+  ) +
+    labs(title = paste(label_N, "vs", label_T), x = "", y = "Expression") +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+  stat_row <- stat_df[stat_df$GeneSymbol == gene, ]
+  if (nrow(stat_row) == 1 && stat_row$Significant) {
+    pval <- stat_row$P_Value
+    p <- p + annotate("text", x = 0.4, y = pval_y,
+                      label = paste0("P Val. = ", pval),
+                      color = "red", size = 5, hjust = 0)
+  }
+  
+  if (show_points) {
+    p <- p + geom_jitter(width = 0.2, size = 1.5, alpha = 0.6)
+  }
+  
+  return(p)
+}
+
+# 유전자별 하나씩 R에서 출력
+for (gene in genes_to_analyze) {
+  expr_B_N <- as.numeric(df_B_N[df_B_N$GeneSymbol == gene, -1])
+  expr_B_T <- as.numeric(df_B_T[df_B_T$GeneSymbol == gene, -1])
+  p_B <- make_pubr_vioplot(expr_B_N, expr_B_T, "B_N", "B_T", stat_result_B, gene, pval_y = 10)
+  
+  expr_F1_N <- as.numeric(df_F1_N[df_F1_N$GeneSymbol == gene, -1])
+  expr_F1_T <- as.numeric(df_F1_T[df_F1_T$GeneSymbol == gene, -1])
+  p_F1 <- make_pubr_vioplot(expr_F1_N, expr_F1_T, "F1_N", "F1_T", stat_result_F1, gene, pval_y = 10)
+  
+  expr_F2_N <- as.numeric(df_F2_N[df_F2_N$GeneSymbol == gene, -1])
+  expr_F2_T <- as.numeric(df_F2_T[df_F2_T$GeneSymbol == gene, -1])
+  p_F2 <- make_pubr_vioplot(expr_F2_N, expr_F2_T, "F2_N", "F2_T", stat_result_F2, gene, pval_y = 10)
+  
+  # R plot 창에 바로 출력
+  grid.arrange(
+    p_B, p_F1, p_F2,
+    ncol = 3,
+    top = textGrob(paste("Gene:", gene), gp = gpar(fontsize = 20, fontface = "bold"))
+  )
+}
+```
+### PDF
+```{r}
+make_pubr_vioplot <- function(expr_N, expr_T, label_N, label_T, stat_df, gene,
+                              median_line_size = 0.6,        # 중앙선 굵기
+                              show_points = FALSE,
+                              pval_y = 10) {  # P-value 텍스트 y위치 고정
+  df_plot <- data.frame(
+    Expression = c(expr_N, expr_T),
+    Group = rep(c(label_N, label_T), times = c(length(expr_N), length(expr_T)))
+  )
+  
+  # 기본 바이올린 + 박스 플롯
+  p <- ggviolin(
+    df_plot,
+    x = "Group", y = "Expression", fill = "Group",
+    add = "boxplot",
+    add.params = list(fill = "white", width = 0.1, size = median_line_size),  # 중앙선 두께 조절
+    palette = "jco",
+    trim = FALSE
+  ) +
+    labs(title = paste(label_N, "vs", label_T), x = "", y = "Expression") +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+  # 유의성 표시
+  stat_row <- stat_df[stat_df$GeneSymbol == gene, ]
+  if (nrow(stat_row) == 1 && stat_row$Significant) {
+    pval <- stat_row$P_Value
+    p <- p + annotate("text", x = 0.4, y = pval_y,
+                      label = paste0("P Val. = ", pval), # 유의성 텍스트 위치 고정
+                      color = "red", size = 5, hjust = 0)
+  }
+  
+  # jitter 추가 여부
+  if (show_points) {
+    p <- p + geom_jitter(width = 0.2, size = 1.5, alpha = 0.6)
+  }
+  
+  return(p)
+}
+
+# PDF 저장
+pdf("selected_gene_expression_violin_boxplots.pdf", width = 8.33, height = 6.25)
+
+for (gene in genes_to_analyze) {
+  expr_B_N <- as.numeric(df_B_N[df_B_N$GeneSymbol == gene, -1])
+  expr_B_T <- as.numeric(df_B_T[df_B_T$GeneSymbol == gene, -1])
+  p_B <- make_pubr_vioplot(expr_B_N, expr_B_T, "B_N", "B_T", stat_result_B, gene)
+  
+  expr_F1_N <- as.numeric(df_F1_N[df_F1_N$GeneSymbol == gene, -1])
+  expr_F1_T <- as.numeric(df_F1_T[df_F1_T$GeneSymbol == gene, -1])
+  p_F1 <- make_pubr_vioplot(expr_F1_N, expr_F1_T, "F1_N", "F1_T", stat_result_F1, gene)
+  
+  expr_F2_N <- as.numeric(df_F2_N[df_F2_N$GeneSymbol == gene, -1])
+  expr_F2_T <- as.numeric(df_F2_T[df_F2_T$GeneSymbol == gene, -1])
+  p_F2 <- make_pubr_vioplot(expr_F2_N, expr_F2_T, "F2_N", "F2_T", stat_result_F2, gene)
+  
+  # 가로 배치로 한 페이지 출력
+  grid.arrange(
+    p_B, p_F1, p_F2,
+    ncol = 3,
+    top = textGrob(paste("Gene:", gene), gp = gpar(fontsize = 20, fontface = "bold"))
+  )
+}
+
+dev.off()
+```
