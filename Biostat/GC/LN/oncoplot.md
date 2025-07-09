@@ -30,7 +30,9 @@ Load both oncoplot.xlsx and tpm.txt
 - 2: Missense
 - 3: Nonsense
 - 4: Splice
-- 5: Indel We’ll exploit those 5 characters only to draw the oncoplot.
+- 5: Indel
+
+We’ll exploit those 5 characters only to draw the oncoplot.
 
 <!-- -->
 
