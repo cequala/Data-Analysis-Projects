@@ -260,7 +260,7 @@ ComBat
     ## Warning: ggrepel: 286 unlabeled data points (too many overlaps). Consider
     ## increasing max.overlaps
 
-![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
 \# Combine exprdata with mini omnidata
 
     ##              E01_B_T  E01_F1_T   E02_B_T E02_F1_T   E02_F2_N
@@ -574,7 +574,7 @@ R_F1_T vs NR_F1_T, R_F2_N vs NR_F2_N, R_F2_T vs NR_F2_T
 
 ### Box + Violin plots
 
-![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-1.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-2.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-3.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-4.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-5.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-6.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-7.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-8.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-9.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-66-10.png)<!-- -->
+![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-1.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-2.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-3.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-4.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-5.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-6.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-7.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-8.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-9.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-66-10.png)<!-- -->
 \### PDF
 
     ## png 
@@ -830,7 +830,7 @@ R_F1_T vs NR_F1_T, R_F2_N vs NR_F2_N, R_F2_T vs NR_F2_T
 
 ### Box + Violin plots
 
-![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-1.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-2.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-3.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-4.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-5.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-6.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-7.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-8.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-9.png)<!-- -->![](Batch_corr_with_omnidata_files/figure-gfm/unnamed-chunk-81-10.png)<!-- -->
+![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-1.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-2.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-3.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-4.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-5.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-6.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-7.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-8.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-9.png)<!-- -->![](Batch_Corr_-_Statistical_Analysis_-_VlnPlots_of_TPM_files/figure-gfm/unnamed-chunk-81-10.png)<!-- -->
 \### PDF
 
     ## png 
