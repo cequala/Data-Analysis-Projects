@@ -1602,7 +1602,7 @@ print(p)
 ```
 
 ![](copyKAT_files/figure-gfm/Individual%20Barplot%20-%20NRP,%20Grid-1.png)<!-- -->
-\## Barplots in wide (PDF)
+## Barplots in wide (PDF)
 
 ``` r
 suppressPackageStartupMessages({
