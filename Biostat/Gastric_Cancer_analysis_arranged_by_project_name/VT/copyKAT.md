@@ -1550,7 +1550,7 @@ df_plot <- df_indiv %>%
 # --- 3) 100% stacked bar ---
 p <- ggplot(df_plot, aes(x = tp, y = percent, fill = cell_cycle)) +
   geom_col(width = 0.75) +
-  facet_wrap(~ patient, ncol = 3) +                 # 3열 그리드
+  facet_wrap(~ patient, ncol = 3) +
   scale_fill_manual(values = cc_cols, name = "Cell cycle") +
   scale_y_continuous(limits = c(0, 100),
                      breaks = c(0, 25, 50, 75, 100),
@@ -1602,7 +1602,7 @@ print(p)
 ```
 
 ![](copyKAT_files/figure-gfm/Individual%20Barplot%20-%20NRP,%20Grid-1.png)<!-- -->
-\## Barplots in wide (PDF)
+## Barplots in wide (PDF)
 
 ``` r
 suppressPackageStartupMessages({
